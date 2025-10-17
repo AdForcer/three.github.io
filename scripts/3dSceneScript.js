@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Fonloader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometires/TextGeometry.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -44,6 +46,9 @@ function createSkyboxEquirectangular() {
     });
 }
 
+
+
+
 class CRTFilter {
     constructor(renderer, scene, camera) {
         this.renderer = renderer;
@@ -69,7 +74,6 @@ class CRTFilter {
             }
         );
         
-        // Шейдерный материал с исправленными краями
         this.crtMaterial = new THREE.ShaderMaterial({
             uniforms: {
                 tDiffuse: { value: this.rt.texture },
@@ -79,7 +83,7 @@ class CRTFilter {
                 scanlines: { value: 600.0 },
                 scanlineIntensity: { value: 0.15 },
                 vignetting: { value: 0.4 },
-                chromaAberration: { value: 0.001 }, // Уменьшена аберрация
+                chromaAberration: { value: 0.01 },
                 edgeWarp: { value: 0.2 },
                 screenCurvature: { value: 0.1 },
                 resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
@@ -201,6 +205,8 @@ class CRTFilter {
 
 const crtFilter = new CRTFilter(renderer, scene, camera);
 
+
+// Камерные дела всякие!
 camera.position.x = -200;
 camera.position.y = 50;
 camera.rotation.y -= 1.6;
@@ -212,13 +218,13 @@ class CameraAnimation {
         this.progress = 0;
         this.speed = 0.002;
         this.isAnimating = false;
-        this.hasCompleted = false; // Флаг завершения анимации
+        this.hasCompleted = false;
         
         this.setupAnimationCurve();
     }
     
     setupAnimationCurve() {
-        // Создаем кривую Безье для плавного движения
+
         const points = [
             new THREE.Vector3(-200, 50, 0),
             new THREE.Vector3(-20, 57, 4),
@@ -226,7 +232,7 @@ class CameraAnimation {
         ];
         
         this.curve = new THREE.CatmullRomCurve3(points);
-        this.curve.closed = false; // Не зацикливаем анимацию
+        this.curve.closed = false;
     }
     
     startAnimation() {
@@ -282,32 +288,9 @@ class CameraAnimation {
     }
 }
 
-function fly_animation_x() {
-    while (camera.position.x < -20) {
-        camera.position.x+=0.00001;
-        
-    }
-}
-
-function fly_animation_y() {
-    while (camera.position.y < 57) {
-        camera.position.y+=0.00001;
-    }
-}
-
-function fly_animation_z() {
-    while (camera.position.z < 4) {
-        camera.position.z+=0.00001;
-    }
-}
-
 const cameraAnimation = new CameraAnimation(camera);
 
 let clock = new THREE.Clock();
-
-setTimeout(() => {
-    cameraAnimation.startAnimation();
-}, 2500);
 
 function animate() {
     // Используем CRT фильтр для рендеринга
@@ -315,12 +298,6 @@ function animate() {
     const deltaTime = clock.getDelta();
     // Обновляем анимацию камеры
     cameraAnimation.update(deltaTime);
-    //fly_animation_x();
-    //fly_animation_y();
-    //fly_animation_z();
-    
-    // camera.rotation.x += 0.009;
-    // camera.rotation.y += 0.009;
 }
 
 function onWindowResize() {
@@ -332,6 +309,43 @@ function onWindowResize() {
     crtFilter.onWindowResize();
 }
 
+// Кнопочки
+const buttonGeometry = new THREE.BoxGeometry(1,1,1);
+const buttonMaterial = new THREE.MeshBasicMaterial({color:0x00883fff});
+const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
+buttonMesh.position.set(-190, 50, 0);
+scene.add(buttonMesh);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onMouseMove(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function onClick(event) {
+    // Обновляем координаты мыши при клике (на всякий случай)
+    onMouseMove(event);
+    
+    // Обновляем матрицы мира всех объектов сцены
+    scene.traverse(object => {
+        if (object.isMesh) {
+            object.updateMatrixWorld(true);
+        }
+    });
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects([buttonMesh]);
+    
+    if (intersects.length > 0) {
+        console.log('Button clicked!');
+        cameraAnimation.startAnimation();
+    }
+}
+
 createSkyboxEquirectangular();
 window.addEventListener('resize', onWindowResize, false);
+window.addEventListener('mousemove', onMouseMove, false);
+window.addEventListener('click', onClick, false);
 renderer.setAnimationLoop(animate);
