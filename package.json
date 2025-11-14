@@ -1,5 +1,10 @@
 {
   "dependencies": {
+    "gh-pages": "^6.3.0",
     "three": "^0.180.0"
+  }
+  "scripts": {
+    "build": "vite build",
+    "deploy": "npm run build && gh-pages -d dist"
   }
 }
